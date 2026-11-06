@@ -7,15 +7,17 @@ Zentui custom-variable bus — and nothing at all when no IDE is connected.
 ## Local testing
 
 `.pi/settings.json` does not commit a dogfood install: a normal pi session in this checkout
-does not load the extension. Load it for one run with:
+does not load the extension.
 
-```sh
-pi -e ./src/index.ts
-```
+**Do not load it with `pi -e ./src/index.ts`.** CLI extensions load before installed packages, so
+the tee would sit below `pi-zentui`; Zentui's status controller then hides the statusline text
+and the chip stays empty. A project-local entry (`pi install --local .`) also loads before the
+global packages, so it violates the same load-order contract.
 
-To dogfood interactively, `pi install --local .` writes `"packages": [".."]` into
-`.pi/settings.json`; restart pi or `/reload`, then revert `.pi/settings.json` before
-committing. Treat that declaration as a temporary harness, not repo state.
+To test, add the checkout's absolute path to the **global** `packages` array in
+`~/.pi/agent/settings.json`, immediately after `npm:pi-zentui`, restart pi (or `/reload`), run
+the README's hand checks, and remove the entry afterwards. That matches the documented contract:
+`pi-x-ide` → `pi-zentui` → `pi-ide-status`.
 
 ## Agent skills
 

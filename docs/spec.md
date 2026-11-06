@@ -263,8 +263,8 @@ default export is a function stays.
 
 **Deliberately untested.** Real interop with a running `pi-x-ide` and a real Zentui, terminal
 widths and Zentui's own omission of values that do not fit, and the animation cadence of
-upstream's spinner. These are checked by hand with `pi -e ./src/index.ts` inside a real session,
-as the README's test plan describes.
+upstream's spinner. These are checked by hand with the checkout loaded after `pi-zentui` inside a
+real session, as the README's test plan describes.
 
 **Deliberately tested, unlike the sibling.** The tee, as seam three. `pi-vim-status` leaves its
 glue untested because it only reads; this package mutates an object that every extension in the

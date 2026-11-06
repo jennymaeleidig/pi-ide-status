@@ -51,8 +51,8 @@ Three things must already be true. This package writes none of them, and reads o
 
 ## Test by hand
 
-With the three prerequisites met and the checkout loaded (`pi -e ./src/index.ts`) or installed,
-run through these in a real session:
+With the three prerequisites met and the checkout loaded after `pi-zentui` (see Development), run
+through these in a real session:
 
 1. `/ide settings` → Display → statusline, then open a file in VS Code. The chip appears in the
    configured slot as `⧉ ✓ basename`. If it does not, recheck the prerequisites and load order
@@ -88,8 +88,23 @@ npm test
 npm run format:check
 ```
 
-Load the checkout in place for one session, without installing it:
+Load the checkout in place for one session, without publishing it. **Do not use
+`pi -e ./src/index.ts` for this package:** CLI extensions load before installed packages, so the
+tee would sit _below_ `pi-zentui` and Zentui's status controller would hide the statusline
+text. A project-local entry (`pi install --local .`) also loads before global packages, so it
+does not satisfy the contract either.
 
-```sh
-pi -e ./src/index.ts
+Instead, add the checkout to the **global** `packages` array in `~/.pi/agent/settings.json`,
+immediately after `npm:pi-zentui`, and restart pi (or `/reload`):
+
+```json
+"packages": [
+  "npm:pi-x-ide",
+  "npm:pi-zentui",
+  "/Users/you/Documents/projects/pi-extensions/pi-ide-status",
+  "npm:cc-safety-net"
+]
 ```
+
+Run the hand checks above, then remove the entry. This is the same load-order rule as the
+install instructions, just with a local checkout instead of the git package.
