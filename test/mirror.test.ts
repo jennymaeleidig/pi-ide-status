@@ -113,6 +113,20 @@ const rows: readonly Row[] = [
     expected: { text: "⧉ ✓ index.ts", publish: false },
   },
   {
+    name: "a lone high surrogate is stripped",
+    previous: undefined,
+    raw: "⧉ \uD800✓ index.ts",
+    active: true,
+    expected: { text: "⧉ ✓ index.ts", publish: true },
+  },
+  {
+    name: "a lone low surrogate is stripped",
+    previous: undefined,
+    raw: "⧉ ✓ index.ts\uDC00",
+    active: true,
+    expected: { text: "⧉ ✓ index.ts", publish: true },
+  },
+  {
     name: "a duplicate after SGR stripping emits nothing",
     previous: "⧉ ✓ index.ts",
     raw: "\u001b[2m⧉ ✓ index.ts\u001b[0m",
@@ -160,4 +174,13 @@ test("fitting keeps combining marks attached to their base character", () => {
 test("text at the limit is untouched", () => {
   const text = "a".repeat(MAX_TEXT_CODE_UNITS);
   assert.deepEqual(mirror(undefined, text, true), { text, publish: true });
+});
+
+test("an over-limit text that changes inside the fitted prefix publishes a new value", () => {
+  const first = mirror(undefined, `${"a".repeat(255)}one-tail`, true);
+  const second = mirror(first.text, `${"a".repeat(254)}cone-tail`, true);
+
+  assert.equal(first.text, `${"a".repeat(255)}…`);
+  assert.equal(second.text, `${"a".repeat(254)}c…`);
+  assert.equal(second.publish, true);
 });

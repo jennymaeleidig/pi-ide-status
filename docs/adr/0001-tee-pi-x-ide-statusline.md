@@ -27,8 +27,9 @@ Install a tee over `ctx.ui.setStatus` on the `ui` object pi hands to every exten
 bind, forward every call unchanged, and mirror the calls keyed `pi-x-ide` onto Zentui's
 custom-variable bus under the publisher key `pi-ide-status:ide`.
 
-The mirrored text is verbatim apart from stripping SGR escapes, fitting to the protocol limit at
-a grapheme boundary, and dropping consecutive duplicates.
+The mirrored text is verbatim apart from stripping SGR escapes, control characters and lone
+surrogates, fitting to the protocol limit at a grapheme boundary, and dropping consecutive
+duplicates.
 
 ## Consequences
 

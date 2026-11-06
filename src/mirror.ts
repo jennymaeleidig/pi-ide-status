@@ -14,12 +14,13 @@ export type Mirror = Readonly<{
 
 const SGR = /\x1b\[[0-9;:]*m/g;
 const CONTROL_AND_LINE_BREAK = /\p{Cc}|\p{Zl}|\p{Zp}/gu;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 const ELLIPSIS = "…";
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-/** Remove what the bus must never carry: SGR escapes and control characters. */
+/** Remove what the bus must never carry: SGR, control characters, lone surrogates. */
 function clean(text: string): string {
-  return text.replace(SGR, "").replace(CONTROL_AND_LINE_BREAK, "");
+  return text.replace(SGR, "").replace(CONTROL_AND_LINE_BREAK, "").replace(LONE_SURROGATE, "");
 }
 
 /** Cut at a grapheme boundary, leaving room for the ellipsis inside the budget. */
@@ -27,6 +28,7 @@ function cutToLimit(text: string): string {
   const budget = MAX_TEXT_CODE_UNITS - ELLIPSIS.length;
   let used = 0;
   let head = "";
+  // A single grapheme wider than the budget leaves only the ellipsis.
   for (const { segment } of segmenter.segment(text)) {
     if (used + segment.length > budget) break;
     head += segment;

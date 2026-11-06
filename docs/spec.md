@@ -123,9 +123,11 @@ emitted on `zentui:variable-capability` with this package's publisher key, and r
 every publish, because Zentui clears all values on every `session_start` and has no
 capability-change event. `active` is only trusted when it is exactly `true`.
 
-**Text.** Verbatim apart from three transforms, in this order: strip ANSI sequences and control
-characters, fit to the protocol limit, compare with the previously published value. SGR escapes
-are stripped because upstream colourises the statusline text and the bus carries plain text.
+**Text.** Verbatim apart from three transforms, in this order: strip ANSI sequences, control
+characters and lone surrogates, fit to the protocol limit, compare with the previously published
+value. SGR escapes are stripped because upstream colourises the statusline text and the bus
+carries plain text. A lone surrogate would put an unpaired code unit on the bus, so it is removed
+before fitting rather than trusted to a later cut.
 Fitting cuts at a grapheme boundary and marks the result with an ellipsis so the protocol never
 silently ignores an update, and the ellipsis sits inside the budget: the fitted value, marker
 included, is never longer than 256 UTF-16 code units, because a value that overran the limit
@@ -234,9 +236,10 @@ emitted variable values, the clear-on-inactive behaviour, the warn-once path, th
 `session_shutdown`, and re-installation after a simulated rebind.
 
 **Seam two — the pure mirror.** Table-driven, one `test()` per row, so every case reads as a
-sentence: verbatim passthrough, SGR stripped, control characters stripped, over-limit fitted with
-an ellipsis, cut at a grapheme boundary with no unpaired surrogate, combining marks kept attached
-to their base, a text left empty by stripping clearing, duplicate suppressed, `undefined`
+sentence: verbatim passthrough, SGR stripped, control characters stripped, lone surrogates
+stripped, over-limit fitted with an ellipsis, cut at a grapheme boundary with no unpaired
+surrogate, combining marks kept attached to their base, a text left empty by stripping clearing,
+duplicate suppressed, `undefined`
 clearing, inactive clearing, and a
 change-from-active-to-inactive producing exactly one publication.
 
