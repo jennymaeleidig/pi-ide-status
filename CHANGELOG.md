@@ -8,3 +8,5 @@
   duplicates.
 - Warn once per session when `pi-x-ide`'s `status_display` is `widget`, so an empty chip is
   diagnosable.
+- Contain a throwing predecessor under `pi-x-ide`: no throw escapes and nothing is mirrored, while
+  any other key's failure is forwarded unchanged.

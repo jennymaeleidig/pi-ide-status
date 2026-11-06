@@ -46,14 +46,20 @@ export function createTee(consume: StatusConsumer): Tee {
   const tee = function (this: StatusHost, key: string, text: string | undefined): void {
     const outermost = depth === 0;
     depth += 1;
+    let failed = false;
     try {
       // A tee that displaced us captured us as its predecessor, so forwarding to
       // it would loop back here. On re-entry, call the function beneath us instead.
       const next = depth === 1 ? forward : base;
       if (next !== undefined) Reflect.apply(next, this, [key, text]);
+    } catch (error) {
+      // Our own key's failed write is nothing to do: contain it and publish nothing.
+      // Any other key is forwarded unchanged, so other extensions still see their faults.
+      if (key !== IDE_STATUS_KEY) throw error;
+      failed = true;
     } finally {
       depth -= 1;
-      if (outermost && !restored && key === IDE_STATUS_KEY) {
+      if (outermost && !restored && !failed && key === IDE_STATUS_KEY) {
         try {
           consume(text);
         } catch {

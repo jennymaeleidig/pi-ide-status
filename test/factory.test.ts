@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import { createTee } from "../src/tee.ts";
 import {
   createHarness,
   createUi,
@@ -112,6 +113,38 @@ test("upstream sending undefined clears the chip", async (t) => {
     { key: "pi-ide-status:ide", text: "⧉ ✓ index.ts" },
     { key: "pi-ide-status:ide", text: undefined },
   ]);
+});
+
+test("a wrong-typed statusline text leaves the published value alone", async (t) => {
+  const harness = createHarness({ home: await tempHome(t) });
+  const fake = createUi();
+  await harness.start({ ui: fake.ui });
+
+  fake.ui.setStatus("pi-x-ide", "⧉ ✓ index.ts");
+  const wrongType = 42 as unknown as string;
+  fake.ui.setStatus("pi-x-ide", wrongType);
+
+  assert.deepEqual(variables(harness), [{ key: "pi-ide-status:ide", text: "⧉ ✓ index.ts" }]);
+  assert.equal(fake.calls.at(-1)?.text, wrongType);
+});
+
+test("a tee installed after ours keeps both the chip and its own calls", async (t) => {
+  const harness = createHarness({ home: await tempHome(t) });
+  const fake = createUi();
+  await harness.start({ ui: fake.ui });
+
+  const laterConsumed: Array<string | undefined> = [];
+  const later = createTee((text) => laterConsumed.push(text));
+  later.install(fake.ui);
+
+  fake.ui.setStatus("pi-x-ide", "⧉ ✓ one.ts");
+  fake.ui.setStatus("pi-x-ide", "⧉ ✓ two.ts");
+
+  assert.deepEqual(
+    variables(harness).map((value) => value.text),
+    ["⧉ ✓ one.ts", "⧉ ✓ two.ts"],
+  );
+  assert.deepEqual(laterConsumed, ["⧉ ✓ one.ts", "⧉ ✓ two.ts"]);
 });
 
 test("an inactive Zentui verdict clears the chip rather than freezing it", async (t) => {

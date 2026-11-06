@@ -29,7 +29,8 @@ custom-variable bus under the publisher key `pi-ide-status:ide`.
 
 The mirrored text is verbatim apart from stripping SGR escapes, control characters and lone
 surrogates, fitting to the protocol limit at a grapheme boundary, and dropping consecutive
-duplicates.
+duplicates. A predecessor failure under this package's own `pi-x-ide` key is contained — no throw
+escapes and nothing is mirrored — while any other key's failure is forwarded unchanged.
 
 ## Consequences
 

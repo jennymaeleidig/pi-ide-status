@@ -97,8 +97,11 @@ because it only reads.
 
 **Input.** The tee forwards every `setStatus(key, text)` call unchanged, via `Reflect.apply` with
 the original receiver, and consumes only calls whose key is exactly `pi-x-ide`. Arguments are
-never modified. Consumption happens in a `try`/`finally` around the forward, so a defect in the
-mirror cannot stop the caller's own write; the error path is a silent no-op.
+never modified. A predecessor that throws is contained for calls keyed `pi-x-ide` — the throw
+does not escape and nothing is published, because the write did not land — while a throw under
+any other key is forwarded unchanged, so other extensions still see faults that are not this
+package's to hide. Consumption happens in a `try`/`finally` around the forward, so a defect in
+the mirror cannot stop the caller's own write; the consumer error path is a silent no-op.
 
 **Tee shape.** A data property installed on the `ui` object with `writable` and
 `configurable` both true and the predecessor's `enumerable` copied. The predecessor is captured
@@ -158,10 +161,12 @@ names the setting and points at `/ide settings`; when the configuration is absen
 names any other value, the package stays silent. The resolved value is never cached across
 sessions.
 
-**Failure containment.** Every entry point is total: no `throw` reaches the caller, no async work
-is scheduled, and no unreferenced timer or interval is created. A `ui` object without a
-`setStatus` data property, a non-TUI mode, and a statusline text of the wrong type are all
-"nothing to do".
+**Failure containment.** Every entry point is total for this package's own work: no `throw` from
+the tee's consumer, the mirror, configuration resolution or pi's session hooks reaches the
+caller, no async work is scheduled, and no unreferenced timer or interval is created. A
+predecessor's throw under a key other than `pi-x-ide` is forwarded unchanged rather than
+swallowed. A `ui` object without a `setStatus` data property, a non-TUI mode, a statusline text
+of the wrong type, and a `pi-x-ide` forward that throws are all "nothing to do".
 
 **Probe shape** (settled during grilling, kept because the mutation-in-place contract is the
 easy thing to get wrong):

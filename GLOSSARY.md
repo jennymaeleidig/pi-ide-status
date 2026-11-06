@@ -20,7 +20,8 @@ _Avoid_: Message, output, label, status
 
 **Tee**: The data property this package installs over `ctx.ui.setStatus` on the `ui` object pi
 hands to every extension in one bind. It forwards every call unchanged and copies the ones keyed
-`pi-x-ide` to its own consumer. _Avoid_: Wrapper, hook, patch, interceptor, monkey-patch
+`pi-x-ide` to its own consumer. A failure under that key is contained and mirrors nothing; any
+other key's failure is forwarded unchanged. _Avoid_: Wrapper, hook, patch, interceptor, monkey-patch
 
 **Mirror**: To republish a teed statusline text on the Zentui channel under this package's
 publisher key, stripped of SGR, fitted, and deduplicated. _Avoid_: Forward, copy, relay, sync

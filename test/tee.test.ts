@@ -28,6 +28,21 @@ test("install replaces the descriptor with this package's tee", () => {
   assert.equal(after.writable, true);
   assert.equal(after.configurable, true);
   assert.equal(after.enumerable, before?.enumerable);
+
+  const hidden = {} as StatusHost;
+  Object.defineProperty(hidden, "setStatus", {
+    value: () => {},
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+  const hiddenBefore = Object.getOwnPropertyDescriptor(hidden, "setStatus");
+  const hiddenTee = createTee(() => {});
+
+  hiddenTee.install(hidden);
+  assert.equal(Object.getOwnPropertyDescriptor(hidden, "setStatus")?.enumerable, false);
+  hiddenTee.restore(hidden);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(hidden, "setStatus"), hiddenBefore);
 });
 
 test("every call is forwarded unchanged with the original receiver", () => {
@@ -78,6 +93,88 @@ test("a throwing consumer cannot stop the caller's own write", () => {
   assert.deepEqual(calls, [[IDE_STATUS_KEY, "⧉ ⠋"]]);
 });
 
+test("a forward that throws never lets the throw escape", () => {
+  const consumed: Array<string | undefined> = [];
+  const target: StatusHost = {
+    setStatus(): void {
+      throw new Error("predecessor defect");
+    },
+  };
+  const tee = createTee((text) => consumed.push(text));
+  tee.install(target);
+
+  assert.doesNotThrow(() => target.setStatus(IDE_STATUS_KEY, "⧉ ✕"));
+  assert.deepEqual(consumed, [], "a failed write publishes nothing");
+});
+
+test("a forward that throws under another key still reaches the caller", () => {
+  const target: StatusHost = {
+    setStatus(): void {
+      throw new Error("predecessor defect");
+    },
+  };
+  const tee = createTee(() => {});
+  tee.install(target);
+
+  assert.throws(() => target.setStatus("pi-vim-status:vim", "NORMAL"), /predecessor defect/);
+});
+
+test("contained failures log nothing", () => {
+  const logged: unknown[] = [];
+  const { log, warn, error } = console;
+  console.log = (...args: unknown[]) => {
+    logged.push(args);
+  };
+  console.warn = (...args: unknown[]) => {
+    logged.push(args);
+  };
+  console.error = (...args: unknown[]) => {
+    logged.push(args);
+  };
+
+  try {
+    const consumerTarget = host([]);
+    const consumer = createTee(() => {
+      throw new Error("consumer defect");
+    });
+    consumer.install(consumerTarget);
+    assert.doesNotThrow(() => consumerTarget.setStatus(IDE_STATUS_KEY, "x"));
+
+    const forwardTarget: StatusHost = {
+      setStatus(): void {
+        throw new Error("predecessor defect");
+      },
+    };
+    const forward = createTee(() => {});
+    forward.install(forwardTarget);
+    assert.doesNotThrow(() => forwardTarget.setStatus(IDE_STATUS_KEY, "x"));
+  } finally {
+    console.log = log;
+    console.warn = warn;
+    console.error = error;
+  }
+
+  assert.deepEqual(logged, []);
+});
+
+test("install preserves a non-enumerable predecessor descriptor", () => {
+  const target = {} as StatusHost;
+  Object.defineProperty(target, "setStatus", {
+    value: () => {},
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+  const before = Object.getOwnPropertyDescriptor(target, "setStatus");
+  const tee = createTee(() => {});
+
+  tee.install(target);
+  assert.equal(Object.getOwnPropertyDescriptor(target, "setStatus")?.enumerable, false);
+
+  tee.restore(target);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(target, "setStatus"), before);
+});
+
 test("restore puts the predecessor's descriptor back exactly", () => {
   const target = host();
   const before = Object.getOwnPropertyDescriptor(target, "setStatus");
@@ -124,14 +221,15 @@ test("install over another tee forwards through it and restore unwinds one layer
   assert.deepEqual(Object.getOwnPropertyDescriptor(target, "setStatus"), before);
 });
 
-test("ensure re-installs over a tee that displaced it, and the publish still lands", () => {
+test("ensure reclaims ownership and both tees keep receiving calls", () => {
   const calls: Call[] = [];
   const consumed: Array<string | undefined> = [];
+  const laterConsumed: Array<string | undefined> = [];
   const target = host(calls);
   const first = createTee((text) => consumed.push(text));
   first.install(target);
 
-  const later = createTee(() => {});
+  const later = createTee((text) => laterConsumed.push(text));
   later.install(target);
   assert.equal(first.owns(target), false);
 
@@ -139,8 +237,13 @@ test("ensure re-installs over a tee that displaced it, and the publish still lan
   assert.equal(first.owns(target), true);
 
   target.setStatus(IDE_STATUS_KEY, "⧉ ⇡ index.ts#L1-L4");
-  assert.deepEqual(consumed, ["⧉ ⇡ index.ts#L1-L4"]);
-  assert.deepEqual(calls, [[IDE_STATUS_KEY, "⧉ ⇡ index.ts#L1-L4"]]);
+  target.setStatus(IDE_STATUS_KEY, "⧉ ✓ index.ts#L4-L8");
+  assert.deepEqual(consumed, ["⧉ ⇡ index.ts#L1-L4", "⧉ ✓ index.ts#L4-L8"]);
+  assert.deepEqual(laterConsumed, ["⧉ ⇡ index.ts#L1-L4", "⧉ ✓ index.ts#L4-L8"]);
+  assert.deepEqual(calls, [
+    [IDE_STATUS_KEY, "⧉ ⇡ index.ts#L1-L4"],
+    [IDE_STATUS_KEY, "⧉ ✓ index.ts#L4-L8"],
+  ]);
 
   first.restore(target);
   assert.equal(later.owns(target), true);
