@@ -18,8 +18,10 @@ that file and its line range; when a selection is queued for the next prompt it 
 marker; while the IDE is connecting it shows upstream's spinner; when the IDE is not connected
 it shows nothing at all, and neither the slot nor the frame changes shape.
 
-It never draws rows, owns no border, replaces no editor, opens no socket, polls no directory and
-starts no timer. It writes one value to one slot and clears it again.
+It never draws rows or owns a border; it installs one pass-through editor factory and observes
+renders only to retry a probe that could not be answered before the frame. It opens no socket,
+polls no directory and starts no timer, and it returns the editor's lines untouched. It writes
+one value to one slot and clears it again.
 
 ## User Stories
 
@@ -78,13 +80,16 @@ starts no timer. It writes one value to one slot and clears it again.
 26. As a package author, I want every failure inside the tee contained, so that a bug in this
     package can never prevent `pi-x-ide`'s own status from being written.
 27. As a package author, I want the tee restorable from a test, so that a bug cannot leave the
-    `ui` object every extension shares permanently wrapped.
-28. As a package author, I want the one architectural bet recorded in an ADR, so that the next
+    `ui` object every extension shares permanently teed.
+28. As a package author, I want each architectural bet recorded in an ADR, so that the next
     session does not relitigate it.
 29. As a package author, I want the vocabulary pinned in a glossary, so that "chip", "tee" and
     "mirror" mean one thing in every issue and commit.
 30. As a package author, I want the swap path to an upstream event documented, so that
     retirement is a small change rather than a rewrite.
+
+31. As a pi user, I want the chip at startup, before I type or send a prompt, so that the
+    border describes the attached selection from the next frame on.
 
 ## Implementation Decisions
 
@@ -113,7 +118,9 @@ displaced it, and the publish proceeds. Nothing is logged when this happens.
 
 **Rebind.** The tee is installed in `session_start` and restored in `session_shutdown`, because
 pi builds a fresh `ui` object per bind. Installation is idempotent: session state is reset first,
-so a second `session_start` on a new object never leaves the previous object wrapped.
+so a second `session_start` on a new object never leaves the previous object teed. The
+retained value, the scheduled refresh, the observed editors and the observed editor factory are
+reset with it.
 
 **Channel.** One channel only: the Zentui custom-variable bus. This package never calls
 `ctx.ui.setStatus`, and its publisher key is not a second status channel. When Zentui reports the
@@ -123,8 +130,17 @@ because that surface was never ours.
 
 **Capability probe.** A fresh mutable plain object — never frozen, never carrying accessors — is
 emitted on `zentui:variable-capability` with this package's publisher key, and re-emitted on
-every publish, because Zentui clears all values on every `session_start` and has no
-capability-change event. `active` is only trusted when it is exactly `true`.
+every publish and every render-driven refresh, because Zentui clears all values on every
+`session_start` and has no capability-change event. `active` is only trusted when it is exactly
+`true`.
+
+**Startup readiness.** Zentui may answer a startup probe inactive because its editor is not yet
+safely decorated, and it ignores positive updates while inactive. The tee's first statusline
+text therefore arrives before the chip can publish. This package retains the latest teed value,
+observes the current editor's render, and schedules at most one refresh per microtask after a
+render. The refresh probes again and republishes the retained value once the probe is active,
+which puts the chip on screen before the user sends a prompt, without a timer or a directory
+poll. The editor's lines are returned untouched; the package owns no editor and draws no row.
 
 **Text.** Verbatim apart from three transforms, in this order: strip ANSI sequences, control
 characters and lone surrogates, fit to the protocol limit, compare with the previously published
@@ -162,11 +178,12 @@ names any other value, the package stays silent. The resolved value is never cac
 sessions.
 
 **Failure containment.** Every entry point is total for this package's own work: no `throw` from
-the tee's consumer, the mirror, configuration resolution or pi's session hooks reaches the
-caller, no async work is scheduled, and no unreferenced timer or interval is created. A
-predecessor's throw under a key other than `pi-x-ide` is forwarded unchanged rather than
-swallowed. A `ui` object without a `setStatus` data property, a non-TUI mode, a statusline text
-of the wrong type, and a `pi-x-ide` forward that throws are all "nothing to do".
+the tee's consumer, the mirror, configuration resolution, the observed render or pi's session
+hooks reaches the caller. The only deferred work is one coalesced microtask after an editor
+render; no timer or interval is created. A predecessor's throw under a key other than `pi-x-ide`
+is forwarded unchanged rather than swallowed. A `ui` object without a `setStatus` data property or
+an editor method pair, an editor whose `render` is missing or frozen, a non-TUI mode, a
+statusline text of the wrong type, and a `pi-x-ide` forward that throws are all "nothing to do".
 
 **Probe shape** (settled during grilling, kept because the mutation-in-place contract is the
 easy thing to get wrong):
@@ -234,11 +251,15 @@ how many times a helper was called when the emitted value already proves it.
 **Seam one — the extension factory.** The highest seam available: it proves the package wires
 itself correctly, and every end-to-end behaviour lands here. A fake `pi` records `events.emit`
 payloads and captures the `session_start` / `session_shutdown` handlers; a fake `ui` is a plain
-object carrying `setStatus` as a real data property; a temporary home directory holds `pi-x-ide`
+object carrying `setStatus` as a real data property and, when an editor is requested, the
+`getEditorComponent` / `setEditorComponent` pair; a temporary home directory holds `pi-x-ide`
 configuration files, passed in with a cwd per the config-resolution decision above. The test
 drives `session_start`, calls the recorded `setStatus` the way upstream would, and asserts the
 emitted variable values, the clear-on-inactive behaviour, the warn-once path, the restore on
-`session_shutdown`, and re-installation after a simulated rebind.
+`session_shutdown` (including the editor factory), re-installation after a simulated rebind, a
+startup value dropped while inactive being published after the first render, renders coalescing
+into one probe, a shutdown cancelling a scheduled refresh, a frozen render and a `ui` without an
+editor pair falling back to the event-driven path, and a render refresh reclaiming a later tee.
 
 **Seam two — the pure mirror.** Table-driven, one `test()` per row, so every case reads as a
 sentence: verbatim passthrough, SGR stripped, control characters stripped, lone surrogates
@@ -308,11 +329,13 @@ its README says so.
 **Compatibility risk.** The tee depends on pi building one `ui` object per bind with `setStatus`
 as a data property, on Zentui mutating the probe in place, and on `pi-x-ide` keeping
 `status_display: "statusline"` as an option. Each is checked by a test that fails loudly rather
-than by a version range, and each is named in the ADR so the next upgrade has a short list.
+than by a version range, and each is named in the ADR so the next upgrade has a short list. The
+render-driven retry has a looser dependency — `getEditorComponent`, `setEditorComponent` and a
+callable, assignable `render` — and is optional: a different shape leaves the event-driven path
+working, which the tests assert rather than fail on.
 
 **Test plan by hand**, for the README rather than a test suite: `/ide settings` → Display →
-statusline; open a file in VS Code and watch the chip appear; move the cursor and watch the line
-span follow; send a prompt and watch `⇡` become `✓`; close the IDE and watch the chip go away;
-narrow the terminal to 60 columns and watch Zentui drop the chip while the Vim chip keeps its
-place;
-`/reload` and confirm the chip comes back once, not twice and not never.
+statusline; start pi and watch the chip appear before sending a prompt; move the cursor and
+watch the line span follow; send a prompt and watch `⇡` become `✓`; close the IDE and watch the
+chip go away; narrow the terminal to 60 columns and watch Zentui drop the chip while the Vim
+chip keeps its place; `/reload` and confirm the chip comes back once, not twice and not never.

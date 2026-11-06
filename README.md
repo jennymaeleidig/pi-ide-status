@@ -4,8 +4,9 @@ Show the file and line range open in your IDE in a Zentui Minimalist border slot
 Vim mode chip — and nothing at all when no IDE is connected.
 
 > Status: implemented for the first end-to-end slice. The design is settled and written down in
-> [`docs/spec.md`](docs/spec.md); the vocabulary is in [`GLOSSARY.md`](GLOSSARY.md) and the one
-> architectural bet in [`docs/adr/0001-tee-pi-x-ide-statusline.md`](docs/adr/0001-tee-pi-x-ide-statusline.md).
+> [`docs/spec.md`](docs/spec.md); the vocabulary is in [`GLOSSARY.md`](GLOSSARY.md) and the two
+> architectural bets in [`docs/adr/0001-tee-pi-x-ide-statusline.md`](docs/adr/0001-tee-pi-x-ide-statusline.md)
+> and [`docs/adr/0002-republish-on-editor-render.md`](docs/adr/0002-republish-on-editor-render.md).
 
 ## Install
 
@@ -60,8 +61,8 @@ With the three prerequisites met and the checkout loaded after `pi-zentui` (see 
 through these in a real session:
 
 1. `/ide settings` → Display → statusline, then open a file in VS Code. The chip appears in the
-   configured slot as `⧉ ✓ basename`. If it does not, recheck the prerequisites and load order
-   above before suspecting the package.
+   configured slot as `⧉ ✓ basename` before you type or send a prompt. If it does not, recheck
+   the prerequisites and load order above before suspecting the package.
 2. Move the cursor in VS Code. The line span follows (`index.ts#L12-L15`).
 3. Send a prompt with a selection attached. The pending marker `⇡` becomes `✓` once the selection
    is attached.

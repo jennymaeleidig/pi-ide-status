@@ -11,16 +11,40 @@ export type Emitted = Readonly<{ channel: string; data: unknown }>;
 export type StatusCall = Readonly<{ key: string; text: string | undefined }>;
 export type Notice = Readonly<{ message: string; type: string | undefined }>;
 
+export interface FakeEditor {
+  render(width: number): string[];
+}
+
 export interface FakeUi {
   ui: ExtensionUIContext;
   calls: StatusCall[];
   notices: Notice[];
+  /** Invoke the installed editor factory and render one frame. */
+  renderEditor(width?: number): string[];
+  /** The factory the ui would instantiate, for restore assertions. */
+  currentEditorFactory(): unknown;
 }
 
 /** A `ui` whose `setStatus` is a real, plain data property, as pi builds it. */
-export function createUi(): FakeUi {
+export function createUi(options: { editor?: boolean; frozenRender?: boolean } = {}): FakeUi {
   const calls: StatusCall[] = [];
   const notices: Notice[] = [];
+  let editor: FakeEditor | undefined;
+  let factory: ((tui: unknown, theme: unknown, keybindings: unknown) => FakeEditor) | undefined;
+  if (options.editor === true) {
+    factory = () => {
+      if (editor !== undefined) return editor;
+      editor = { render: (width: number) => [`rendered ${width}`] };
+      if (options.frozenRender === true) {
+        Object.defineProperty(editor, "render", {
+          value: editor.render,
+          writable: false,
+          configurable: false,
+        });
+      }
+      return editor;
+    };
+  }
   const ui = {
     setStatus(key: string, text: string | undefined): void {
       calls.push({ key, text });
@@ -28,8 +52,26 @@ export function createUi(): FakeUi {
     notify(message: string, type?: "info" | "warning" | "error"): void {
       notices.push({ message, type });
     },
+    ...(options.editor === true
+      ? {
+          getEditorComponent: () => factory,
+          setEditorComponent: (next: typeof factory) => {
+            factory = next;
+          },
+        }
+      : {}),
   };
-  return { ui: ui as unknown as ExtensionUIContext, calls, notices };
+  const renderEditor = (width = 80): string[] => {
+    if (factory === undefined) throw new Error("no editor component is installed");
+    return factory({}, {}, {}).render(width);
+  };
+  return {
+    ui: ui as unknown as ExtensionUIContext,
+    calls,
+    notices,
+    renderEditor,
+    currentEditorFactory: () => factory,
+  };
 }
 
 type Handler = (event: unknown, ctx: ExtensionContext) => unknown;
