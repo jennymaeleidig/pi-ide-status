@@ -45,6 +45,11 @@ Three things must already be true. This package writes none of them, and reads o
    slot that references it, Zentui reports the key as not active and the chip can only reach the
    `$extensions` aggregate, where it sorts alphabetically instead of sitting beside the Vim chip.
 
+   Keep `pi-x-ide` hidden in Zentui's extension-status visibility (`extensionStatuses`). This
+   package mirrors the same statusline text into the slot, so marking `pi-x-ide` as `show`
+   renders upstream's own statusline a second time, in Zentui's extension-status surface. The
+   alias and slot are the only surface this package needs.
+
 3. **The package sits after `npm:pi-zentui`** in the `packages` array of
    `~/.pi/agent/settings.json`. That is load order again, and the symptom is the same one: an
    empty slot and nothing in the log.
