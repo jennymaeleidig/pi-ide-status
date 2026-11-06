@@ -3,10 +3,9 @@
 Show the file and line range open in your IDE in a Zentui Minimalist border slot, next to your
 Vim mode chip — and nothing at all when no IDE is connected.
 
-> Status: scaffolding. The design is settled and written down in [`docs/spec.md`](docs/spec.md);
-> the vocabulary is in [`GLOSSARY.md`](GLOSSARY.md) and the one architectural bet in
-> [`docs/adr/0001-tee-pi-x-ide-statusline.md`](docs/adr/0001-tee-pi-x-ide-statusline.md). No
-> behaviour is implemented yet.
+> Status: implemented for the first end-to-end slice. The design is settled and written down in
+> [`docs/spec.md`](docs/spec.md); the vocabulary is in [`GLOSSARY.md`](GLOSSARY.md) and the one
+> architectural bet in [`docs/adr/0001-tee-pi-x-ide-statusline.md`](docs/adr/0001-tee-pi-x-ide-statusline.md).
 
 ## Install
 
