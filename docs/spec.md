@@ -173,10 +173,30 @@ declare function mirror(
 manifest so an accidental `publish` fails loudly, while `npm` remains the package manager for
 development and for the `npm install --omit=dev` that a git install performs.
 
-**Configuration, handed to the user rather than written by this repo.** Zentui's Minimalist
-style gains the alias `ide` pointing at `pi-ide-status:ide`, and the chosen slot references
-`$ide` to the left of `$vim`, so the Vim chip keeps its position and the IDE chip clips first
-when the terminal narrows.
+**Configuration is documented, never written.** The package reads no settings file of its own
+and writes none. Three pieces of the user's existing configuration are prerequisites, and the
+README documents all three with the symptom of each being wrong:
+
+1. `pi-x-ide` must run with `status_display: "statusline"` (`~/.pi/pi-x-ide/config.json`, project
+   config overriding global). With the default `widget` it never calls `setStatus`, and the chip
+   has no input at all.
+2. The package must appear in the `packages` array of `~/.pi/agent/settings.json` **after**
+   `npm:pi-zentui`, per the load-order contract. During development that entry is the checkout's
+   absolute path, because this repository has no published history to clone; a release swaps in
+   the git form.
+3. Zentui's Minimalist style needs an alias naming the publisher key, and a slot referencing it
+   to the left of the Vim chip so the IDE chip clips first:
+
+   ```json
+   "variables": { "ide": "pi-ide-status:ide", "vim": "pi-vim-status:vim" },
+   "formats": { "bottomRight": "$ide $vim" }
+   ```
+
+   The alias value is the full publisher key, not a short name. The slot choice is the user's:
+   `bottomMiddle` and `bottomLeft` work equally, at the cost of competing with `$cwd` and the git
+   branch for the same budget. Without both an alias and a slot referencing it, Zentui reports the
+   key as not active, and the chip can only ever reach the `$extensions` aggregate, where it sorts
+   ahead of the Vim chip instead of beside it.
 
 ## Testing Decisions
 
@@ -223,6 +243,8 @@ session shares, so a broken restore is a session-wide fault and earns a unit tes
 - Zed-, nvim- or JetBrains-specific behaviour beyond what the shared statusline text gives for
   free.
 - Any second slot, alias, or publisher key, and any settings file of this package's own.
+- Writing, applying or migrating the three configuration files above: they belong to the user and
+  to their dotfile manager, and this repository only documents them.
 - Acting on the selection: attaching, opening, jumping, or accepting diagnostics.
 - Colour configuration for the chip beyond what Zentui already offers per publisher.
 - Changing `pi-x-ide` itself. The upstream status event is a separate issue with its own spec.
