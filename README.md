@@ -28,6 +28,10 @@ first text and the chip stays empty until the next IDE or prompt event. Zentui m
 own controller over the tee later in the same start, so every publish re-installs the tee above
 it.
 
+`pi install` appends to `packages`. If `pi-ide-status`, `pi-x-ide` or `pi-zentui` is already
+installed, put the `pi-ide-status` source first in the array and restart. Update the git source
+with `pi update git:github.com/jennymaeleidig/pi-ide-status`.
+
 ## Configuration
 
 Three things must already be true. This package writes none of them, and reads only the first.
