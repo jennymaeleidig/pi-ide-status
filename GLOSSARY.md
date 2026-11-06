@@ -18,9 +18,9 @@ package. _Avoid_: Badge, tag, indicator, widget
 with SGR escapes and begins with the `⧉` glyph, a state marker, a basename, and a line span.
 _Avoid_: Message, output, label, status
 
-**Tee**: The data-property wrapper this package installs over `ctx.ui.setStatus` on the `ui`
-object pi hands to every extension in one bind. It forwards every call unchanged and copies the
-ones keyed `pi-x-ide` to its own consumer. _Avoid_: Hook, patch, interceptor, monkey-patch
+**Tee**: The data property this package installs over `ctx.ui.setStatus` on the `ui` object pi
+hands to every extension in one bind. It forwards every call unchanged and copies the ones keyed
+`pi-x-ide` to its own consumer. _Avoid_: Wrapper, hook, patch, interceptor, monkey-patch
 
 **Mirror**: To republish a teed statusline text on the Zentui channel under this package's
 publisher key, stripped of SGR, fitted, and deduplicated. _Avoid_: Forward, copy, relay, sync
@@ -42,13 +42,14 @@ removes the chip. This package's only output. _Avoid_: Event bus, Zentui API
 publisher key. It is not a guarantee that the chip is visible at the current width. _Avoid_:
 Enabled, visible, owned, available
 
-**Fitted label**: A label cut at a grapheme boundary to at most 256 UTF-16 code units and marked
-with an ellipsis, so the protocol never silently ignores an update. _Avoid_: Truncated, clipped,
-shortened
+**Fitted value**: A statusline text cut at a grapheme boundary to at most 256 UTF-16 code units
+and marked with an ellipsis, so the protocol never silently ignores an update. Only a value past
+the protocol limit is ever fitted, so the chip differs from upstream's own text in that case
+alone. _Avoid_: Label, truncated, clipped, shortened
 
-**Wrapper ownership**: The condition that this package's tee is the own `setStatus` property of
-the current `ui` object. Every publish checks it and re-installs the tee when a foreign wrapper
-has displaced it. _Avoid_: Registration, installation, control
+**Tee ownership**: The condition that this package's tee is the own `setStatus` property of the
+current `ui` object. Every publish checks it and re-installs the tee when a later tee has
+displaced it. _Avoid_: Wrapper, registration, installation, control
 
 **Rebind**: pi building a fresh `ui` object and calling every extension's `session_start` again —
 on `/reload`, a new session, or a session switch. The tee does not survive a rebind and must be

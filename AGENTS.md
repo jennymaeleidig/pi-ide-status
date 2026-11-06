@@ -1,7 +1,8 @@
 # pi-ide-status
 
-Bridge between `pi-x-ide` and Zentui: publish the IDE's connection status on Zentui's
-custom-variable bus, with Pi's extension status channel as the fallback.
+Bridge between `pi-x-ide` and Zentui: mirror the file and line range the IDE has attached to
+the prompt into Zentui's Minimalist border, next to the Vim mode chip. One channel only — the
+Zentui custom-variable bus — and nothing at all when no IDE is connected.
 
 ## Local testing
 

@@ -44,7 +44,7 @@ a grapheme boundary, and dropping consecutive duplicates.
 - The package depends on an internal pi API shape: one `ui` object per bind, with `setStatus` as
   a data property (`interactive-mode.js:1562` calls `createExtensionUIContext()` once and passes
   the result to `session.bindExtensions`). A pi release that changes this breaks the tee
-  silently, and the mitigation is a test over the wrapper plus a re-install on every publish.
+  silently, and the mitigation is a test over the tee plus a re-install on every publish.
 - Load order becomes part of the contract: the tee must be installed after `pi-zentui`, so
   Zentui's own status controller finds itself no longer the owner, marks itself inactive and
   passes through.

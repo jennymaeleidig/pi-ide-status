@@ -29,7 +29,7 @@ starts no timer. It writes one value to one slot and clears it again.
 2. As a pi user, I want the selected line range shown alongside the file, so that I can confirm
    the exact span that will enter my prompt.
 3. As a pi user, I want the chip to sit next to my Vim mode chip, so that the border reads as
-   one status line instead of two unrelated indicators.
+   one status line instead of two chips that look unrelated.
 4. As a pi user, I want the chip to update as I move the cursor in VS Code, so that it describes
    the present state rather than the state of my last prompt.
 5. As a pi user, I want the chip to appear when I focus another file in VS Code, so that I do
@@ -88,22 +88,24 @@ starts no timer. It writes one value to one slot and clears it again.
 
 ## Implementation Decisions
 
-**Modules.** Four, mirroring the shape of the sibling `pi-vim-status`: a pure `mirror` module
-(the only seam with interesting logic), a `status-display` module that answers "what does
-`pi-x-ide`'s configured display mode resolve to", a `tee` module owning the wrapper, and the
-entry module that wires them to pi events and holds all mutable state in one closure.
+**Modules.** Four, cut along the same lines the tests use: a pure `mirror` module (the only pure
+logic in the package), a `status-display` module that answers "what does `pi-x-ide`'s configured
+display mode resolve to", a `tee` module owning the property install and restore, and the entry
+module that wires them to pi events and holds all mutable state in one closure. This is this
+package's own decomposition, not a copy of a sibling's: `pi-vim-status` gets by with two files
+because it only reads.
 
 **Input.** The tee forwards every `setStatus(key, text)` call unchanged, via `Reflect.apply` with
 the original receiver, and consumes only calls whose key is exactly `pi-x-ide`. Arguments are
 never modified. Consumption happens in a `try`/`finally` around the forward, so a defect in the
 mirror cannot stop the caller's own write; the error path is a silent no-op.
 
-**Wrapper shape.** A data property installed on the `ui` object with `writable` and
+**Tee shape.** A data property installed on the `ui` object with `writable` and
 `configurable` both true and the predecessor's `enumerable` copied. The predecessor is captured
 at install time, never looked up at call time. Restore puts the predecessor's descriptor back.
 
-**Wrapper ownership.** Each publish re-reads the own descriptor of `setStatus` on the current `ui`
-object; when the own value is not this package's tee, the tee is re-installed above whatever
+**Tee ownership.** Each publish re-reads the own descriptor of `setStatus` on the current `ui`
+object; when the own value is not this package's tee, the tee is re-installed above the tee that
 displaced it, and the publish proceeds. Nothing is logged when this happens.
 
 **Rebind.** The tee is installed in `session_start` and restored in `session_shutdown`, because
@@ -111,8 +113,10 @@ pi builds a fresh `ui` object per bind. Installation is idempotent: session stat
 so a second `session_start` on a new object never leaves the previous object wrapped.
 
 **Channel.** One channel only: the Zentui custom-variable bus. This package never calls
-`ctx.ui.setStatus`. When Zentui reports the key is not active, the value is cleared rather than
-frozen, and the fallback is upstream's own statusline, which is already on the footer surface.
+`ctx.ui.setStatus`, and its publisher key is not a second status channel. When Zentui reports the
+key is not active, the value is cleared rather than frozen, and the fallback is whatever upstream
+already draws for itself — its widget, or its statusline where the configuration renders one —
+because that surface was never ours.
 
 **Capability probe.** A fresh mutable plain object — never frozen, never carrying accessors — is
 emitted on `zentui:variable-capability` with this package's publisher key, and re-emitted on
@@ -122,14 +126,21 @@ capability-change event. `active` is only trusted when it is exactly `true`.
 **Text.** Verbatim apart from three transforms, in this order: strip ANSI sequences and control
 characters, fit to the protocol limit, compare with the previously published value. SGR escapes
 are stripped because upstream colourises the statusline text and the bus carries plain text.
-Fitting cuts at a grapheme boundary at no more than 256 UTF-16 code units, reserving the final
-cell for an ellipsis, so the protocol never silently ignores an update. An empty result, and a
-`undefined` text, both mean "clear".
+Fitting cuts at a grapheme boundary at no more than 256 UTF-16 code units, and marks the result
+with an ellipsis so the protocol never silently ignores an update; the ellipsis is this package's
+own mark and the only respect in which the chip can differ from what upstream would have drawn,
+which it does solely when a path exceeds the protocol limit. An empty result, and a `undefined`
+text, both mean "clear".
 
-**Text policy.** All of upstream's states pass through unchanged: the `✓` connected marker, the
-`⇡` pending marker, the `⠋` connecting spinner frames, the `✕` error marker. No format of this
-package's own is ever derived from the text, because the text is upstream's and re-deriving it
-would break on their next wording change.
+At narrow widths the package does nothing special: Zentui drops a value that does not fit rather
+than drawing a broken one, and dropping the chip while keeping the Vim chip is the intended
+outcome, not a fault to correct.
+
+**Text policy.** The chip is upstream's own string: the `⧉` glyph, a state marker, the basename,
+and a line span. Every one of upstream's states passes through unchanged: the `✓` connected
+marker, the `⇡` pending marker, the `⠋` connecting spinner frames, the `✕` error marker. No
+format of this package's own is ever derived from the text, because the text is upstream's and
+re-deriving it would break on their next wording change.
 
 **Publisher key.** The fixed string `pi-ide-status:ide`, on every publication. Zentui sorts
 custom values by key, so in the `$extensions` aggregate this chip renders before
@@ -169,13 +180,17 @@ declare function mirror(
 ): Mirror;
 ```
 
+**Config resolution.** The resolver takes an explicit home directory and cwd rather than reading
+the environment, so a test can point it at a temporary directory without mutating `process.env`
+or shadowing `os.homedir()`.
+
 **Packaging.** Installed from git; never published to a registry. `private: true` in the
 manifest so an accidental `publish` fails loudly, while `npm` remains the package manager for
 development and for the `npm install --omit=dev` that a git install performs.
 
 **Configuration is documented, never written.** The package reads no settings file of its own
 and writes none. Three pieces of the user's existing configuration are prerequisites, and the
-README documents all three with the symptom of each being wrong:
+README must document all three with the symptom of each being wrong:
 
 1. `pi-x-ide` must run with `status_display: "statusline"` (`~/.pi/pi-x-ide/config.json`, project
    config overriding global). With the default `widget` it never calls `setStatus`, and the chip
@@ -184,19 +199,20 @@ README documents all three with the symptom of each being wrong:
    `npm:pi-zentui`, per the load-order contract. During development that entry is the checkout's
    absolute path, because this repository has no published history to clone; a release swaps in
    the git form.
-3. Zentui's Minimalist style needs an alias naming the publisher key, and a slot referencing it
-   to the left of the Vim chip so the IDE chip clips first:
+3. Zentui's Minimalist style needs an alias naming the publisher key, and a slot referencing it.
+   The decided placement is `bottomRight`, left of the Vim chip, so the Vim chip keeps its place
+   when Zentui has to drop a value for width:
 
    ```json
    "variables": { "ide": "pi-ide-status:ide", "vim": "pi-vim-status:vim" },
    "formats": { "bottomRight": "$ide $vim" }
    ```
 
-   The alias value is the full publisher key, not a short name. The slot choice is the user's:
-   `bottomMiddle` and `bottomLeft` work equally, at the cost of competing with `$cwd` and the git
-   branch for the same budget. Without both an alias and a slot referencing it, Zentui reports the
-   key as not active, and the chip can only ever reach the `$extensions` aggregate, where it sorts
-   ahead of the Vim chip instead of beside it.
+   The alias value is the full publisher key, not a short name. `bottomRight` is the decision;
+   `bottomMiddle` and `bottomLeft` also work, at the cost of competing with `$cwd` and the git
+   branch for the same budget, and are not what was chosen. Without both an alias and a slot
+   referencing it, Zentui reports the key as not active, and the chip can only ever reach the
+   `$extensions` aggregate, where it sorts ahead of the Vim chip instead of beside it.
 
 ## Testing Decisions
 
@@ -205,11 +221,11 @@ of every `zentui:variable` emission, the `notify` calls, and the descriptor stat
 object after install and restore. No test reaches into module-private state, and none asserts on
 how many times a helper was called when the emitted value already proves it.
 
-**Seam one — the extension factory.** The highest seam available and the one that covers the
-dangerous code. A fake `pi` records `events.emit` payloads and captures the `session_start` /
-`session_shutdown` handlers; a fake `ui` is a plain object carrying `setStatus` as a real data
-property, so the descriptor dance is exercised for real; a temporary home directory holds
-`pi-x-ide` configuration files, and the factory is given that directory and a cwd. The test
+**Seam one — the extension factory.** The highest seam available: it proves the package wires
+itself correctly, and every end-to-end behaviour lands here. A fake `pi` records `events.emit`
+payloads and captures the `session_start` / `session_shutdown` handlers; a fake `ui` is a plain
+object carrying `setStatus` as a real data property; a temporary home directory holds `pi-x-ide`
+configuration files, passed in with a cwd per the config-resolution decision above. The test
 drives `session_start`, calls the recorded `setStatus` the way upstream would, and asserts the
 emitted variable values, the clear-on-inactive behaviour, the warn-once path, the restore on
 `session_shutdown`, and re-installation after a simulated rebind.
@@ -220,18 +236,26 @@ an ellipsis, cut at a grapheme boundary with no unpaired surrogate, combining ma
 to their base, duplicate suppressed, `undefined` clearing, inactive clearing, and a
 change-from-active-to-inactive producing exactly one publication.
 
+**Seam three — the tee alone.** The descriptor mechanics, tested directly against a fake `ui`
+whose `setStatus` is a real data property: install over a pristine object, install over an object
+that already carries another tee, forward with the original receiver and unchanged arguments,
+restore the predecessor's descriptor exactly, and re-install when a later tee has taken the own
+property. It is deliberately redundant with seam one rather than folded into it, because it is
+the seam that protects every other extension in the session.
+
 **Prior art.** `pi-vim-status`'s `test/reconcile.test.ts` is the model for the pure table and for
 its fitting assertions; `pi-copy-paste`'s `test/helpers.ts` is the model for the fake-`pi`
 harness, which captures registrations and replays handlers. The smoke test asserting that the
 default export is a function stays.
 
 **Deliberately untested.** Real interop with a running `pi-x-ide` and a real Zentui, terminal
-widths and clipping, and the animation cadence of upstream's spinner. These are checked by hand
-with `pi -e ./src/index.ts` inside a real session, as the README's test plan describes.
+widths and Zentui's own omission of values that do not fit, and the animation cadence of
+upstream's spinner. These are checked by hand with `pi -e ./src/index.ts` inside a real session,
+as the README's test plan describes.
 
-**Deliberately tested, unlike the sibling.** The wrapper itself. `pi-vim-status` leaves its glue
-untested because it only reads; this package mutates an object that every extension in the
-session shares, so a broken restore is a session-wide fault and earns a unit test.
+**Deliberately tested, unlike the sibling.** The tee, as seam three. `pi-vim-status` leaves its
+glue untested because it only reads; this package mutates an object that every extension in the
+session shares, so a broken restore is a session-wide fault and earns its own seam.
 
 ## Out of Scope
 
@@ -247,16 +271,21 @@ session shares, so a broken restore is a session-wide fault and earns a unit tes
   to their dotfile manager, and this repository only documents them.
 - Acting on the selection: attaching, opening, jumping, or accepting diagnostics.
 - Colour configuration for the chip beyond what Zentui already offers per publisher.
-- Changing `pi-x-ide` itself. The upstream status event is a separate issue with its own spec.
+- Changing `pi-x-ide` itself. The upstream status event is not filed yet; when it is, it gets its
+  own issue and its own spec, and this one only records the swap path.
 - Any behaviour in non-TUI sessions.
 
 ## Further Notes
 
+**This document is the spec, twice.** It is published verbatim as issue #1 in this repository,
+labelled `ready-for-agent`, and that issue is the work item. Keep the two in step; the file is
+the durable copy.
+
 **Load order is part of the contract.** The required chain is
 `pi-x-ide` → `pi-zentui` → `pi-ide-status`: this package must load after `pi-zentui`, so
 Zentui's status controller is already installed when the tee goes over it, finds it is no longer
-the owner, and goes inert instead of suppressing publications. The README must state the
-required order and the symptom of getting it wrong, which is a permanently empty chip.
+the owner, and goes inert instead of suppressing publications. The README states the required
+order and the symptom of getting it wrong, which is a permanently empty chip.
 
 **Retirement.** The package exists because `pi-x-ide` publishes no event. When upstream emits its
 status on `pi.events`, the tee is deleted and the mirror reads the event instead; everything
@@ -271,5 +300,6 @@ than by a version range, and each is named in the ADR so the next upgrade has a 
 **Test plan by hand**, for the README rather than a test suite: `/ide settings` → Display →
 statusline; open a file in VS Code and watch the chip appear; move the cursor and watch the line
 span follow; send a prompt and watch `⇡` become `✓`; close the IDE and watch the chip go away;
-narrow the terminal to 60 columns and watch the chip clip while the Vim chip keeps its place;
+narrow the terminal to 60 columns and watch Zentui drop the chip while the Vim chip keeps its
+place;
 `/reload` and confirm the chip comes back once, not twice and not never.
