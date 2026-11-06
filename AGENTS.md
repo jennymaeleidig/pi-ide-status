@@ -15,9 +15,11 @@ and the chip stays empty. A project-local entry (`pi install --local .`) also lo
 global packages, so it violates the same load-order contract.
 
 To test, add the checkout's absolute path to the **global** `packages` array in
-`~/.pi/agent/settings.json`, immediately after `npm:pi-zentui`, restart pi (or `/reload`), run
-the README's hand checks, and remove the entry afterwards. That matches the documented contract:
-`pi-x-ide` → `pi-zentui` → `pi-ide-status`.
+`~/.pi/agent/settings.json`, immediately after `npm:pi-zentui`, then **fully exit pi and start a
+fresh `pi`** — not `/reload`, and never in the same process that used `-e`. CLI paths are merged
+first and deduplicated by resolved path, so an `-e` copy keeps the early slot and leaves the tee
+below `pi-zentui`. Run the README's hand checks, then remove the entry. That matches the
+documented contract: `pi-x-ide` → `pi-zentui` → `pi-ide-status`.
 
 ## Agent skills
 

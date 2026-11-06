@@ -100,7 +100,7 @@ text. A project-local entry (`pi install --local .`) also loads before global pa
 does not satisfy the contract either.
 
 Instead, add the checkout to the **global** `packages` array in `~/.pi/agent/settings.json`,
-immediately after `npm:pi-zentui`, and restart pi (or `/reload`):
+immediately after `npm:pi-zentui`, then **fully exit pi and start a fresh `pi`**:
 
 ```json
 "packages": [
@@ -113,3 +113,8 @@ immediately after `npm:pi-zentui`, and restart pi (or `/reload`):
 
 Run the hand checks above, then remove the entry. This is the same load-order rule as the
 install instructions, just with a local checkout instead of the git package.
+
+A full restart is required whenever the package list or this entry's position changes.
+`/reload` keeps any `-e` extension in front of the installed packages, and pi deduplicates the
+`-e` copy against the package copy by resolved path. The surviving copy stays below `pi-zentui`,
+so the tee sees only the hidden `undefined` and the chip never fills.
