@@ -4,7 +4,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { createHarness, createUi, probes, variables, writePiXIdeConfig } from "./helpers.ts";
+import {
+  createHarness,
+  createUi,
+  probes,
+  variables,
+  writePiXIdeConfig,
+  writePiXIdeConfigText,
+} from "./helpers.ts";
 
 async function tempHome(t: TestContext): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), "pi-ide-status-home-"));
@@ -271,6 +278,62 @@ test("a project configuration overrides the warned global one", async (t) => {
   await harness.start({ ui: fake.ui, cwd });
 
   assert.deepEqual(fake.notices, []);
+});
+
+test("a project widget value raises the warning over a global statusline", async (t) => {
+  const home = await tempHome(t);
+  const cwd = await tempHome(t);
+  await writePiXIdeConfig(home, "statusline");
+  await writePiXIdeConfig(cwd, "widget");
+  const harness = createHarness({ home });
+  const fake = createUi();
+
+  await harness.start({ ui: fake.ui, cwd });
+
+  assert.equal(fake.notices.length, 1);
+  assert.equal(fake.notices[0]?.type, "warning");
+  assert.match(fake.notices[0]?.message ?? "", /status_display/);
+  assert.match(fake.notices[0]?.message ?? "", /\/ide settings/);
+});
+
+test("a malformed configuration stays silent", async (t) => {
+  const home = await tempHome(t);
+  await writePiXIdeConfigText(home, "{ not json");
+  const harness = createHarness({ home });
+  const fake = createUi();
+
+  await harness.start({ ui: fake.ui });
+
+  assert.deepEqual(fake.notices, []);
+});
+
+test("an unrecognised configuration value stays silent", async (t) => {
+  const home = await tempHome(t);
+  await writePiXIdeConfig(home, "sidebar");
+  const harness = createHarness({ home });
+  const fake = createUi();
+
+  await harness.start({ ui: fake.ui });
+
+  assert.deepEqual(fake.notices, []);
+});
+
+test("a configuration change takes effect on the next session", async (t) => {
+  const home = await tempHome(t);
+  const cwd = await tempHome(t);
+  await writePiXIdeConfig(home, "widget");
+  const harness = createHarness({ home });
+  const first = createUi();
+  const second = createUi();
+
+  await harness.start({ ui: first.ui, cwd });
+  assert.equal(first.notices.length, 1);
+
+  await harness.shutdown({ ui: first.ui });
+  await writePiXIdeConfig(home, "statusline");
+  await harness.start({ ui: second.ui, cwd });
+
+  assert.deepEqual(second.notices, []);
 });
 
 test("no configuration at all stays silent", async (t) => {

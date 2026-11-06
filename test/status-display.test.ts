@@ -40,6 +40,13 @@ test("the project configuration overrides the global one", async (t) => {
   assert.equal(resolveStatusDisplay({ home, cwd }), "statusline");
 });
 
+test("a project widget overrides a global statusline", async (t) => {
+  const { home, cwd } = await roots(t);
+  await writePiXIdeConfig(home, "statusline");
+  await writePiXIdeConfig(cwd, "widget");
+  assert.equal(resolveStatusDisplay({ home, cwd }), "widget");
+});
+
 test("a project configuration without the key falls through to the global one", async (t) => {
   const { home, cwd } = await roots(t);
   await writePiXIdeConfig(home, "statusline");
@@ -63,6 +70,13 @@ test("a configuration naming no recognised value resolves to nothing", async (t)
 test("an unreadable or malformed configuration resolves to nothing", async (t) => {
   const { home, cwd } = await roots(t);
   await writePiXIdeConfigText(home, "{ not json");
+  assert.equal(resolveStatusDisplay({ home, cwd }), undefined);
+});
+
+test("an unreadable configuration resolves to nothing", async (t) => {
+  const { home, cwd } = await roots(t);
+  // A directory at the config path makes readFileSync throw.
+  await mkdir(join(home, ".pi", "pi-x-ide", "config.json"), { recursive: true });
   assert.equal(resolveStatusDisplay({ home, cwd }), undefined);
 });
 
