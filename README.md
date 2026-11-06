@@ -6,7 +6,7 @@ Vim mode chip — and nothing at all when no IDE is connected.
 > Status: implemented for the first end-to-end slice. The design is settled and written down in
 > [`docs/spec.md`](docs/spec.md); the vocabulary is in [`GLOSSARY.md`](GLOSSARY.md) and the two
 > architectural bets in [`docs/adr/0001-tee-pi-x-ide-statusline.md`](docs/adr/0001-tee-pi-x-ide-statusline.md)
-> and [`docs/adr/0002-republish-on-editor-render.md`](docs/adr/0002-republish-on-editor-render.md).
+> and [`docs/adr/0002-retry-the-startup-value.md`](docs/adr/0002-retry-the-startup-value.md).
 
 ## Install
 

@@ -23,16 +23,11 @@ hands to every extension in one bind. It forwards every call unchanged and copie
 `pi-x-ide` to its own consumer. A failure under that key is contained and mirrors nothing; any
 other key's failure is forwarded unchanged. _Avoid_: Wrapper, hook, patch, interceptor, monkey-patch
 
+**Refresh**: One capability probe and, when active, a republish of the retained value. After a
+rejected startup publish it repeats every 100 ms for at most 3 seconds, then stops. _Avoid_:
+Retry loop, poll, tick
+
 **Mirror**: To republish a teed statusline text on the Zentui channel under this package's
-publisher key, stripped of SGR, fitted, and deduplicated. _Avoid_: Forward, copy, relay, sync
-
-**Refresh**: One capability probe and, when active, a republish of the retained value; scheduled
-at most once per microtask after an observed editor render, never on a timer. _Avoid_: Retry
-loop, poll, tick
-
-**Observed editor**: The current editor whose `render` this package watches to schedule a
-refresh. The package owns no editor, draws no row, and returns its lines untouched. _Avoid_:
-Wrapped editor, patched editor, hook
 
 **Publisher key**: The fixed key `pi-ide-status:ide` under which every value is published. It
 is stable across releases. _Avoid_: Variable name, id, status key
@@ -61,8 +56,8 @@ current `ui` object. Every publish checks it and re-installs the tee when a late
 displaced it. _Avoid_: Wrapper, registration, installation, control
 
 **Rebind**: pi building a fresh `ui` object and calling every extension's `session_start` again —
-on `/reload`, a new session, or a session switch. The tee and the observed editor factory do not
-survive a rebind and must be re-installed. _Avoid_: Reload, restart, reinitialise
+on `/reload`, a new session, or a session switch. The tee and any pending retry do not survive a
+rebind and must be re-installed. _Avoid_: Reload, restart, reinitialise
 
 **Load order**: The position of a package in pi's `packages` array. This package must load after
 `pi-zentui`, so Zentui's own status controller is already installed and becomes inert beneath

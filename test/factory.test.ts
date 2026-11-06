@@ -161,6 +161,7 @@ test("an inactive Zentui verdict clears the chip rather than freezing it", async
     { key: "pi-ide-status:ide", text: undefined },
   ]);
   assert.equal(probes(harness).at(-1)?.active, false);
+  await harness.shutdown({ ui: fake.ui });
 });
 
 test("every publish re-emits a fresh mutable capability probe", async (t) => {
@@ -378,9 +379,10 @@ test("no configuration at all stays silent", async (t) => {
   assert.deepEqual(fake.notices, []);
 });
 
-test("a startup publish dropped before the editor is ready is retried on render", async (t) => {
+test("a startup value dropped while inactive is published after the retry delay", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const harness = createHarness({ home: await tempHome(t) });
-  const fake = createUi({ editor: true });
+  const fake = createUi();
   harness.setZentuiActive(false);
 
   await harness.start({ ui: fake.ui });
@@ -388,90 +390,60 @@ test("a startup publish dropped before the editor is ready is retried on render"
   assert.deepEqual(variables(harness), [], "the inactive probe drops the startup value");
 
   harness.setZentuiActive(true);
-  assert.deepEqual(fake.renderEditor(80), ["rendered 80"], "the editor's lines are untouched");
-  await Promise.resolve();
-
+  t.mock.timers.tick(100);
   assert.deepEqual(variables(harness), [{ key: "pi-ide-status:ide", text: "⧉ ✓ startup.ts" }]);
 });
 
-test("renders coalesce into one capability probe", async (t) => {
-  const harness = createHarness({ home: await tempHome(t) });
-  const fake = createUi({ editor: true });
-  harness.setZentuiActive(false);
-  await harness.start({ ui: fake.ui });
-  fake.ui.setStatus("pi-x-ide", "⧉ ✓ startup.ts");
-  const before = probes(harness).length;
-
-  harness.setZentuiActive(true);
-  fake.renderEditor(80);
-  fake.renderEditor(80);
-  await Promise.resolve();
-
-  assert.equal(probes(harness).length, before + 1);
-});
-
-test("a shutdown cancels a scheduled render refresh", async (t) => {
-  const harness = createHarness({ home: await tempHome(t) });
-  const fake = createUi({ editor: true });
-  harness.setZentuiActive(false);
-  await harness.start({ ui: fake.ui });
-  fake.ui.setStatus("pi-x-ide", "⧉ ✓ startup.ts");
-
-  harness.setZentuiActive(true);
-  fake.renderEditor(80);
-  await harness.shutdown({ ui: fake.ui });
-  await Promise.resolve();
-
-  assert.deepEqual(variables(harness), []);
-});
-
-test("a shutdown restores the editor factory it displaced", async (t) => {
-  const harness = createHarness({ home: await tempHome(t) });
-  const fake = createUi({ editor: true });
-  const before = fake.currentEditorFactory();
-
-  await harness.start({ ui: fake.ui });
-  assert.notEqual(fake.currentEditorFactory(), before);
-
-  await harness.shutdown({ ui: fake.ui });
-  assert.equal(fake.currentEditorFactory(), before);
-});
-
-test("a frozen editor render is left alone and still renders", async (t) => {
-  const harness = createHarness({ home: await tempHome(t) });
-  const fake = createUi({ editor: true, frozenRender: true });
-  harness.setZentuiActive(false);
-
-  await harness.start({ ui: fake.ui });
-  fake.ui.setStatus("pi-x-ide", "⧉ ✓ frozen.ts");
-  harness.setZentuiActive(true);
-  assert.deepEqual(fake.renderEditor(80), ["rendered 80"]);
-  await Promise.resolve();
-  assert.deepEqual(variables(harness), [], "a frozen render is not observed");
-
-  fake.ui.setStatus("pi-x-ide", "⧉ ✓ events.ts");
-  assert.deepEqual(variables(harness), [{ key: "pi-ide-status:ide", text: "⧉ ✓ events.ts" }]);
-});
-
-test("a render refresh reclaims a tee installed after ours", async (t) => {
-  const harness = createHarness({ home: await tempHome(t) });
-  const fake = createUi({ editor: true });
-  await harness.start({ ui: fake.ui });
-
-  const later = createTee(() => {});
-  later.install(fake.ui);
-  fake.renderEditor(80);
-  await Promise.resolve();
-
-  assert.equal(later.owns(fake.ui), false);
-});
-
-test("a ui without an editor component keeps the event-driven path", async (t) => {
+test("the retry stops after the first active probe", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const harness = createHarness({ home: await tempHome(t) });
   const fake = createUi();
-
+  harness.setZentuiActive(false);
   await harness.start({ ui: fake.ui });
-  fake.ui.setStatus("pi-x-ide", "⧉ ✓ events.ts");
+  fake.ui.setStatus("pi-x-ide", "⧉ ✓ startup.ts");
 
-  assert.deepEqual(variables(harness), [{ key: "pi-ide-status:ide", text: "⧉ ✓ events.ts" }]);
+  harness.setZentuiActive(true);
+  t.mock.timers.tick(100);
+  const afterSuccess = probes(harness).length;
+  t.mock.timers.tick(1000);
+  assert.equal(probes(harness).length, afterSuccess);
+});
+
+test("an active publish starts no retry", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const harness = createHarness({ home: await tempHome(t) });
+  const fake = createUi();
+  await harness.start({ ui: fake.ui });
+
+  fake.ui.setStatus("pi-x-ide", "⧉ ✓ active.ts");
+  const afterPublish = probes(harness).length;
+  t.mock.timers.tick(5000);
+  assert.equal(probes(harness).length, afterPublish);
+});
+
+test("the retry is bounded", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const harness = createHarness({ home: await tempHome(t) });
+  const fake = createUi();
+  harness.setZentuiActive(false);
+  await harness.start({ ui: fake.ui });
+  fake.ui.setStatus("pi-x-ide", "⧉ ✓ startup.ts");
+
+  for (let i = 0; i < 60; i += 1) t.mock.timers.tick(100);
+  assert.equal(probes(harness).length, 31, "one publish probe plus thirty retries");
+});
+
+test("a shutdown cancels a pending retry", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const harness = createHarness({ home: await tempHome(t) });
+  const fake = createUi();
+  harness.setZentuiActive(false);
+  await harness.start({ ui: fake.ui });
+  fake.ui.setStatus("pi-x-ide", "⧉ ✓ startup.ts");
+
+  await harness.shutdown({ ui: fake.ui });
+  harness.setZentuiActive(true);
+  t.mock.timers.tick(5000);
+
+  assert.deepEqual(variables(harness), []);
 });

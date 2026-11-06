@@ -10,5 +10,6 @@
   diagnosable.
 - Contain a throwing predecessor under `pi-x-ide`: no throw escapes and nothing is mirrored, while
   any other key's failure is forwarded unchanged.
-- Retain the startup value and republish it after each editor render, because Zentui's startup
-  probe can precede its first safe decoration and drops positive updates while inactive.
+- Retain the startup value and retry the probe every 100 ms for at most 3 seconds after Zentui
+  rejects it, because its startup probe can precede the first safe decoration and it drops
+  positive updates while inactive. The retry stops on success or shutdown.
