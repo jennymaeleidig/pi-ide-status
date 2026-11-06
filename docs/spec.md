@@ -126,11 +126,13 @@ capability-change event. `active` is only trusted when it is exactly `true`.
 **Text.** Verbatim apart from three transforms, in this order: strip ANSI sequences and control
 characters, fit to the protocol limit, compare with the previously published value. SGR escapes
 are stripped because upstream colourises the statusline text and the bus carries plain text.
-Fitting cuts at a grapheme boundary at no more than 256 UTF-16 code units, and marks the result
-with an ellipsis so the protocol never silently ignores an update; the ellipsis is this package's
-own mark and the only respect in which the chip can differ from what upstream would have drawn,
-which it does solely when a path exceeds the protocol limit. An empty result, and a `undefined`
-text, both mean "clear".
+Fitting cuts at a grapheme boundary and marks the result with an ellipsis so the protocol never
+silently ignores an update, and the ellipsis sits inside the budget: the fitted value, marker
+included, is never longer than 256 UTF-16 code units, because a value that overran the limit
+would be dropped and freeze the chip. The ellipsis is this package's own mark and the only
+respect in which the chip can differ from what upstream would have drawn, which it does solely
+when a path exceeds the protocol limit. An empty result, and a `undefined` text, both mean
+"clear".
 
 At narrow widths the package does nothing special: Zentui drops a value that does not fit rather
 than drawing a broken one, and dropping the chip while keeping the Vim chip is the intended
@@ -147,8 +149,9 @@ custom values by key, so in the `$extensions` aggregate this chip renders before
 `pi-vim-status:vim`; adjacency to the Vim chip is a configuration concern, not a package one.
 
 **Diagnostics.** At `session_start`, the effective `status_display` is resolved by reading
-`pi-x-ide`'s global configuration and then its project configuration, project overriding global,
-using the documented file format. When the effective value is `widget`, one `notify` per session
+`pi-x-ide`'s global configuration at `<home>/.pi/pi-x-ide/config.json` and then its project
+configuration at `<cwd>/.pi/pi-x-ide/config.json`, project overriding global, using the
+documented file format. When the effective value is `widget`, one `notify` per session
 names the setting and points at `/ide settings`; when the configuration is absent, unreadable, or
 names any other value, the package stays silent. The resolved value is never cached across
 sessions.
@@ -233,15 +236,17 @@ emitted variable values, the clear-on-inactive behaviour, the warn-once path, th
 **Seam two — the pure mirror.** Table-driven, one `test()` per row, so every case reads as a
 sentence: verbatim passthrough, SGR stripped, control characters stripped, over-limit fitted with
 an ellipsis, cut at a grapheme boundary with no unpaired surrogate, combining marks kept attached
-to their base, duplicate suppressed, `undefined` clearing, inactive clearing, and a
+to their base, a text left empty by stripping clearing, duplicate suppressed, `undefined`
+clearing, inactive clearing, and a
 change-from-active-to-inactive producing exactly one publication.
 
 **Seam three — the tee alone.** The descriptor mechanics, tested directly against a fake `ui`
 whose `setStatus` is a real data property: install over a pristine object, install over an object
 that already carries another tee, forward with the original receiver and unchanged arguments,
 restore the predecessor's descriptor exactly, and re-install when a later tee has taken the own
-property. It is deliberately redundant with seam one rather than folded into it, because it is
-the seam that protects every other extension in the session.
+property. The tee takes its consumer as an argument, so this seam can pass in a consumer that
+throws and assert the forward still lands. It is deliberately redundant with seam one rather
+than folded into it, because it is the seam that protects every other extension in the session.
 
 **Prior art.** `pi-vim-status`'s `test/reconcile.test.ts` is the model for the pure table and for
 its fitting assertions; `pi-copy-paste`'s `test/helpers.ts` is the model for the fake-`pi`
