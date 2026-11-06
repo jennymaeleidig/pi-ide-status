@@ -279,8 +279,8 @@ default export is a function stays.
 
 **Deliberately untested.** Real interop with a running `pi-x-ide` and a real Zentui, terminal
 widths and Zentui's own omission of values that do not fit, and the animation cadence of
-upstream's spinner. These are checked by hand with the checkout loaded after `pi-zentui` inside a
-real session, as the README's test plan describes.
+upstream's spinner. These are checked by hand with the checkout loaded first inside a real
+session, as the README's test plan describes.
 
 **Deliberately tested, unlike the sibling.** The tee, as seam three. `pi-vim-status` leaves its
 glue untested because it only reads; this package mutates an object that every extension in the
@@ -311,10 +311,12 @@ labelled `ready-for-agent`, and that issue is the work item. Keep the two in ste
 the durable copy.
 
 **Load order is part of the contract.** The required chain is
-`pi-x-ide` → `pi-zentui` → `pi-ide-status`: this package must load after `pi-zentui`, so
-Zentui's status controller is already installed when the tee goes over it, finds it is no longer
-the owner, and goes inert instead of suppressing publications. The README states the required
-order and the symptom of getting it wrong, which is a permanently empty chip.
+`pi-ide-status` → `pi-x-ide` → `pi-zentui`: this package must load before `pi-x-ide`, because
+`pi-x-ide` publishes its startup statusline from its asynchronous `session_start`. A tee
+installed after that handler misses the first text and the chip stays empty until the next IDE
+or prompt event. Zentui may install its controller over the tee later in the same start; every
+publish calls `ensure`, so the tee re-asserts above it before the next value. The README states
+the required order and the symptom of getting it wrong.
 
 **Retirement.** The package exists because `pi-x-ide` publishes no event. When upstream emits its
 status on `pi.events`, the tee is deleted and the mirror reads the event instead; everything

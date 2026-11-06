@@ -47,9 +47,9 @@ escapes and nothing is mirrored — while any other key's failure is forwarded u
   a data property (`interactive-mode.js:1562` calls `createExtensionUIContext()` once and passes
   the result to `session.bindExtensions`). A pi release that changes this breaks the tee
   silently, and the mitigation is a test over the tee plus a re-install on every publish.
-- Load order becomes part of the contract: the tee must be installed after `pi-zentui`, so
-  Zentui's own status controller finds itself no longer the owner, marks itself inactive and
-  passes through.
+- Load order becomes part of the contract: the tee must be installed before `pi-x-ide`'s
+  asynchronous `session_start` publishes the startup text. Zentui may install its controller
+  later; the tee re-asserts above it on every publish.
 
 ## Alternatives considered
 

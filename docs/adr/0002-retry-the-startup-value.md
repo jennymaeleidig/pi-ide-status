@@ -11,10 +11,14 @@ Zentui's own documentation records the consequence: "Startup probes may precede 
 editor render: probe again on the publisher's next refresh", and positive updates while inactive
 are ignored rather than retained.
 
-`pi-x-ide` publishes its first statusline text during that same startup window. Without a later
-refresh, the first publish in a session is dropped. The chip then appears only when some later
-upstream event — a cursor move, a focus change, or sending a prompt — produces another
-`setStatus` call.
+`pi-x-ide` publishes its first statusline text during that same startup window, from an
+asynchronous `session_start` handler. Without a later refresh, the first publish in a session is
+dropped. The chip then appears only when some later upstream event — a cursor move, a focus
+change, or sending a prompt — produces another `setStatus` call.
+
+The tee is installed before `pi-x-ide` for this reason; a tee installed after that handler never
+sees the startup text. Zentui may install its own status controller later in the start, so the
+tee re-asserts above it on every publish.
 
 An editor-render hook was tried first. It is not reliable here: the TUI can create its editor
 instance before `session_start`, and a new session in the same process reuses that instance. A

@@ -13,18 +13,20 @@ Vim mode chip — and nothing at all when no IDE is connected.
 Load order is part of the contract:
 
 ```text
-pi-x-ide  ->  pi-zentui  ->  pi-ide-status
+pi-ide-status  ->  pi-x-ide  ->  pi-zentui
 ```
 
 ```sh
+pi install git:github.com/jennymaeleidig/pi-ide-status
 pi install npm:pi-x-ide
 pi install npm:pi-zentui
-pi install git:github.com/jennymaeleidig/pi-ide-status
 ```
 
-This package must load **after** `pi-zentui`. It goes over Zentui's own `ctx.ui.setStatus`
-descriptor, and Zentui only steps aside if it is already installed when the tee lands. Loaded
-before `pi-zentui`, the chip stays empty for the whole session, with no error.
+This package must load **before** `pi-x-ide`. The tee has to exist when `pi-x-ide` publishes its
+startup statusline from its asynchronous `session_start`; loaded after it, the tee misses that
+first text and the chip stays empty until the next IDE or prompt event. Zentui may install its
+own controller over the tee later in the same start, so every publish re-installs the tee above
+it.
 
 ## Configuration
 
@@ -51,14 +53,15 @@ Three things must already be true. This package writes none of them, and reads o
    renders upstream's own statusline a second time, in Zentui's extension-status surface. The
    alias and slot are the only surface this package needs.
 
-3. **The package sits after `npm:pi-zentui`** in the `packages` array of
-   `~/.pi/agent/settings.json`. That is load order again, and the symptom is the same one: an
+3. **The package is the first entry** in the `packages` array of
+   `~/.pi/agent/settings.json`, ahead of `npm:pi-x-ide`. That is load order again, and the
+   symptom is the same one: an empty slot until the next IDE or prompt event.
    empty slot and nothing in the log.
 
 ## Test by hand
 
-With the three prerequisites met and the checkout loaded after `pi-zentui` (see Development), run
-through these in a real session:
+With the three prerequisites met and the checkout loaded first (see Development), run through
+these in a real session:
 
 1. `/ide settings` → Display → statusline, then open a file in VS Code. The chip appears in the
    configured slot as `⧉ ✓ basename` before you type or send a prompt. If it does not, recheck
@@ -94,21 +97,25 @@ npm test
 npm run format:check
 ```
 
-Load the checkout in place for one session, without publishing it. **Do not use
-`pi -e ./src/index.ts` for this package:** CLI extensions load before installed packages, so the
-tee would sit _below_ `pi-zentui` and Zentui's status controller would hide the statusline
-text. A project-local entry (`pi install --local .`) also loads before global packages, so it
-does not satisfy the contract either.
+Load the checkout in place for one session, without publishing it:
 
-Instead, add the checkout to the **global** `packages` array in `~/.pi/agent/settings.json`,
-immediately after `npm:pi-zentui`, then **fully exit pi and start a fresh `pi`**:
+```sh
+pi -e ./src/index.ts
+```
+
+CLI extensions load before installed packages, which is the required position: the tee exists
+before `pi-x-ide` publishes. Do not also list the checkout in `packages` while using `-e`; pi
+deduplicates the copy by resolved path and keeps the CLI one, which is already in the right slot.
+
+For a persistent local install, make the checkout the **first** entry in the **global** `packages`
+array in `~/.pi/agent/settings.json`, then **fully exit pi and start a fresh `pi`**:
 
 ```json
 "packages": [
-  "npm:pi-x-ide",
-  "npm:pi-zentui",
   "/Users/you/Documents/projects/pi-extensions/pi-ide-status",
-  "npm:cc-safety-net"
+  "npm:@ff-labs/pi-fff",
+  "npm:pi-x-ide",
+  "npm:pi-zentui"
 ]
 ```
 
@@ -116,6 +123,5 @@ Run the hand checks above, then remove the entry. This is the same load-order ru
 install instructions, just with a local checkout instead of the git package.
 
 A full restart is required whenever the package list or this entry's position changes.
-`/reload` keeps any `-e` extension in front of the installed packages, and pi deduplicates the
-`-e` copy against the package copy by resolved path. The surviving copy stays below `pi-zentui`,
-so the tee sees only the hidden `undefined` and the chip never fills.
+`/reload` keeps any `-e` extension first, which is now the correct position, but a stale process
+started under the old order still has to be replaced.

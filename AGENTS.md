@@ -9,17 +9,16 @@ Zentui custom-variable bus — and nothing at all when no IDE is connected.
 `.pi/settings.json` does not commit a dogfood install: a normal pi session in this checkout
 does not load the extension.
 
-**Do not load it with `pi -e ./src/index.ts`.** CLI extensions load before installed packages, so
-the tee would sit below `pi-zentui`; Zentui's status controller then hides the statusline text
-and the chip stays empty. A project-local entry (`pi install --local .`) also loads before the
-global packages, so it violates the same load-order contract.
+Load it with `pi -e ./src/index.ts`. CLI extensions load before installed packages, which is the
+required position: the tee must exist before `pi-x-ide` publishes from its asynchronous
+`session_start`. Do not also list the checkout in `packages` while using `-e`; pi deduplicates
+by resolved path and keeps the CLI copy, which is already first.
 
-To test, add the checkout's absolute path to the **global** `packages` array in
-`~/.pi/agent/settings.json`, immediately after `npm:pi-zentui`, then **fully exit pi and start a
-fresh `pi`** — not `/reload`, and never in the same process that used `-e`. CLI paths are merged
-first and deduplicated by resolved path, so an `-e` copy keeps the early slot and leaves the tee
-below `pi-zentui`. Run the README's hand checks, then remove the entry. That matches the
-documented contract: `pi-x-ide` → `pi-zentui` → `pi-ide-status`.
+For a persistent local install, make the checkout the **first** entry in the **global**
+`packages` array in `~/.pi/agent/settings.json`, then fully exit pi and start a fresh `pi`. Run
+the README's hand checks, then remove the entry. The contract is
+`pi-ide-status` → `pi-x-ide` → `pi-zentui`: load after `pi-x-ide` and the tee misses upstream's
+startup text; Zentui installing later is handled by the tee re-asserting itself on publish.
 
 ## Agent skills
 
