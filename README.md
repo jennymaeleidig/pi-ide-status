@@ -49,6 +49,36 @@ Three things must already be true. This package writes none of them, and reads o
    `~/.pi/agent/settings.json`. That is load order again, and the symptom is the same one: an
    empty slot and nothing in the log.
 
+## Test by hand
+
+With the three prerequisites met and the checkout loaded (`pi -e ./src/index.ts`) or installed,
+run through these in a real session:
+
+1. `/ide settings` → Display → statusline, then open a file in VS Code. The chip appears in the
+   configured slot as `⧉ ✓ basename`. If it does not, recheck the prerequisites and load order
+   above before suspecting the package.
+2. Move the cursor in VS Code. The line span follows (`index.ts#L12-L15`).
+3. Send a prompt with a selection attached. The pending marker `⇡` becomes `✓` once the selection
+   is attached.
+4. Close the IDE. The chip disappears. Run `/ide off`: it stays gone. Reconnect and it returns.
+5. Narrow the terminal to 60 columns. Zentui drops the chip while the Vim chip keeps its place.
+   This is intended: a chip that does not fit is omitted rather than drawn broken.
+6. Run `/reload`. The chip comes back exactly once — not twice, and not never.
+7. Set `status_display` to `widget` and start a new session. Exactly one warning names
+   `status_display` and `/ide settings`, and no chip appears, because `pi-x-ide` writes no
+   statusline text to mirror.
+
+The chip carries upstream's own text and inherits the Zentui theme; it invents no colour or
+formatting beyond the ellipsis used when a fitted value exceeds the protocol limit.
+
+## Retirement
+
+The package exists because `pi-x-ide` publishes no status event. If upstream starts emitting its
+status on `pi.events`, delete the tee (`src/tee.ts`) and feed the mirror from that event; the
+mirror, fitting, deduplication and Zentui publication stay unchanged. If upstream publishes
+straight onto Zentui's custom-variable bus, delete this package entirely — its README will say
+so. Until then, the tee and the load-order contract above are the compatibility surface.
+
 ## Development
 
 ```sh
