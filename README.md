@@ -3,7 +3,10 @@
 Show `pi-x-ide`'s connection status in a Zentui Minimalist border slot, without giving up
 Zentui's frame.
 
-> Status: scaffolding. The design is being settled; this README grows with the spec.
+> Status: scaffolding. The design is settled and written down in [`docs/spec.md`](docs/spec.md);
+> the vocabulary is in [`GLOSSARY.md`](GLOSSARY.md) and the one architectural bet in
+> [`docs/adr/0001-tee-pi-x-ide-statusline.md`](docs/adr/0001-tee-pi-x-ide-statusline.md). No
+> behaviour is implemented yet.
 
 ## Install
 
