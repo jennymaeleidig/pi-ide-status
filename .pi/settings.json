@@ -1,6 +1,6 @@
 {
   "defaultTools": ["+bash", "+edit", "+write"],
   "toolsetDefaults": {
-      "toolset-state:tbox.tool@git:github.com/jennymaeleidig/pi-copy-paste": { "enabled": false }
+      "toolset-state:tbox.tool@git:github.com/jennymaeleidig/pi-code-handoff": { "enabled": false }
     }
 }
